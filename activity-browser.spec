@@ -14,6 +14,8 @@ python_options = [
 if options.verbose:
     python_options.append(("v", None, "OPTION"))
 
+EXE_ICON = os.path.join("activity_browser", "static", "icons", "activity-browser.ico") if platform.system().lower() == 'windows' else None
+
 a = Analysis(
     ["run-activity-browser.py"],
     pathex=[],
@@ -56,6 +58,7 @@ if options.debug:
         upx=True,
         upx_exclude=[],
         name="activity-browser",
+        icon=EXE_ICON
     )
     target = coll
 else:
@@ -67,6 +70,7 @@ else:
         a.datas,
         name="activity-browser",
         console=False,
+        icon=EXE_ICON
     )
     target = exe
 
