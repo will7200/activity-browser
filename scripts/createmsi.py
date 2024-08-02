@@ -2,7 +2,15 @@
 """
 This script is for generating MSI packages
 for Windows users.
+
+To generate a self-signed certificate for code signing:
+
+    openssl genrsa -out code-signing.key 2048
+    openssl req -new -key code-signing.key -out code-signing.csr
+    openssl x509 -req -days 365 -in code-signing.csr -signkey code-signing.key -out code-signing.crt
+    openssl pkcs12 -export -out code-signing.pfx -inkey code-signing.key -in code-signing.crt -name "ABCodeSigningCert"
 """
+import logging
 import os
 import shutil
 import subprocess
@@ -13,8 +21,11 @@ from glob import glob
 
 sys.path.append(os.getcwd())
 
+# sometimes the signing tool exe is not on PATH, so allow user to set env to it
+WINDOWS_SDK_BIN = os.environ.get("WINDOWS_SDK_BIN", "")
 # Elementtree does not support CDATA. So hack it.
 WINVER_CHECK = "Installed OR (VersionNT64 &gt; 602)>"
+logger = logging.getLogger(__name__)
 
 
 def gen_guid():
@@ -55,17 +66,17 @@ class PackageGenerator:
     Package generator for MSI packages
     """
 
-    def __init__(self):
+    def __init__(self, signing_certificate=None, version=None):
         self.product_name = "Activity Browser"
         self.manufacturer = "The Activity Browser Team"
-        self.version = os.environ.get("VERSION", "0.0.0")
+        self.version = version or os.environ.get("VERSION", "0.0.0")
         if "-" in self.version:
-            versions =  self.version.split("-")
+            versions = self.version.split("-")
             self.version = "{}.{}".format(versions[0], versions[1])
             print("Using version {} instead".format(self.version))
         self.root = None
         self.guid = "*"
-        self.update_guid = "141527EE-E28A-4D14-97A4-92E6075D28B2"
+        self.update_guid = "728A617A-4F3F-49BB-B9E5-5D02F037B67B"
         self.main_xml = "activitybrowser.wxs"
         self.main_o = "activitybrowser.wixobj"
         self.final_output = "activitybrowser-{}-64.msi".format(self.version)
@@ -100,6 +111,7 @@ class PackageGenerator:
         self.feature_components = {}
         for s_d in self.staging_dirs:
             self.feature_components[s_d] = []
+        self.signing_certificate = signing_certificate
 
     def build_dist(self):
         """
@@ -121,7 +133,7 @@ class PackageGenerator:
         pyinst_cmd = [
             pyinstaller,
             "activity-browser.spec",
-            # "--clean",
+            "--clean",
             "--distpath",
             pyinstaller_tmpdir,
         ]
@@ -130,6 +142,25 @@ class PackageGenerator:
         self.del_infodirs(main_stage)
         if not os.path.exists(os.path.join(main_stage, "activity-browser.exe")):
             sys.exit("activity-browser exe missing from staging dir.")
+
+        self.sign_files(os.path.join(main_stage, "*.exe"))
+
+    def sign_files(self, pattern: str):
+        if self.signing_certificate is None:
+            return
+        for file in glob(pattern):
+            logger.info("Signing file: %s", file)
+            subprocess.check_call([
+                os.path.join(WINDOWS_SDK_BIN, 'signtool'),
+                'sign',
+                '/fd',
+                'SHA256',
+                '/t',
+                'http://timestamp.digicert.com',
+                '/f',
+                self.signing_certificate,
+                file
+            ])
 
     def del_infodirs(self, dirname):
         # Starting with 3.9.something there are some
@@ -452,6 +483,7 @@ class PackageGenerator:
                 self.main_xml,
             ]
         )
+        self.sign_files("*.msi")
 
 
 def install_wix():
@@ -475,6 +507,13 @@ def install_wix():
 
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--signing-certificate", help="local signing certificate (pfx format)")
+    parser.add_argument("--version", help="version that the msi will be")
+    options = parser.parse_args()
+
     if not os.path.exists("activity-browser.spec"):
         sys.exit(print("Run me in the top level source dir."))
     if not shutil.which("wix"):
@@ -482,7 +521,7 @@ if __name__ == "__main__":
     if not shutil.which("pyinstaller"):
         subprocess.check_call(["pip", "install", "--upgrade", "pyinstaller"])
 
-    p = PackageGenerator()
+    p = PackageGenerator(**options.__dict__)
     p.build_dist()
     p.generate_files()
     p.build_package()
