@@ -58,7 +58,11 @@ class PackageGenerator:
     def __init__(self):
         self.product_name = "Activity Browser"
         self.manufacturer = "The Activity Browser Team"
-        self.version = "0.0.2"
+        self.version = os.environ.get("VERSION", "0.0.0")
+        if "-" in self.version:
+            versions =  self.version.split("-")
+            self.version = "{}.{}".format(versions[0], versions[1])
+            print("Using version {} instead".format(self.version))
         self.root = None
         self.guid = "*"
         self.update_guid = "141527EE-E28A-4D14-97A4-92E6075D28B2"
@@ -69,6 +73,7 @@ class PackageGenerator:
         self.progfile_dir = "ProgramFiles64Folder"
         redist_globs = [
             "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\VC\\Redist\\MSVC\\*\\MergeModules\\Microsoft_VC142_CRT_x64.msm",
+            "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Redist\\MSVC\\v*\\MergeModules\\Microsoft_VC143_CRT_x64.msm",
             "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Redist\\MSVC\\*\\MergeModules\\Microsoft_VC143_CRT_x64.msm",
         ]
         redist_path = None
@@ -450,9 +455,14 @@ class PackageGenerator:
 
 
 def install_wix():
-    subprocess.check_call(
-        ["dotnet", "nuget", "add", "source", "https://api.nuget.org/v3/index.json"]
-    )
+    try:
+        subprocess.check_output(
+            ["dotnet", "nuget", "add", "source", "https://api.nuget.org/v3/index.json"],
+            stderr=subprocess.STDOUT
+        )
+    except subprocess.CalledProcessError as e:
+        if b'error: The source specified has already been added to the list of available package sources.' not in e.stdout:
+            raise e
     subprocess.check_call(["dotnet", "tool", "install", "--global", "wix"])
     subprocess.check_call(
         [
@@ -469,7 +479,8 @@ if __name__ == "__main__":
         sys.exit(print("Run me in the top level source dir."))
     if not shutil.which("wix"):
         install_wix()
-    # subprocess.check_call(["pip", "install", "--upgrade", "pyinstaller"])
+    if not shutil.which("pyinstaller"):
+        subprocess.check_call(["pip", "install", "--upgrade", "pyinstaller"])
 
     p = PackageGenerator()
     p.build_dist()
