@@ -11,6 +11,7 @@ from typing import TextIO, Type
 
 import platformdirs
 
+BUNDLED = getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
 WHITELIST = ["activity_browser", "brightway2", "bw2data", "bw2io", "C/C++"]
 EXTENDED_CONSOLE = os.environ.get("AB_EXTENDED_CONSOLE", False)
 SIMPLE_CONSOLE = os.environ.get("AB_SIMPLE_CONSOLE", False)
@@ -340,7 +341,7 @@ class LoggingProxy:
 
 
 def exception_hook(
-    error: Type[BaseException], message: BaseException, traceback: TracebackType
+        error: Type[BaseException], message: BaseException, traceback: TracebackType
 ):
     """Exception hook to catch and log exceptions"""
     exc_info = (error, message, traceback)
@@ -361,22 +362,23 @@ def basic_setup():
 
 
 def advanced_setup():
-    # replace the low and high level StdIO's
-    low_level_stdout = LowLevelStdIO(sys.stdout).start_capture("StdoutCapture")
-    # low_level_stderr = LowLevelStdIO(sys.stderr).start_capture("StderrCapture")
-
-    sys.stdout = HighLevelStdIO()
-    # sys.stderr = HighLevelStdIO()
-
     # setting up our own logger
     root = logging.getLogger()
     logging.addLevelName(25, "PRINT")
 
-    # setting up the console handler
-    console_handler = ABConsoleHandler(low_level_stdout)
-    console_handler.addFilter(log_filter)
-    console_handler.setLevel(LOG_LEVEL)
-    root.addHandler(console_handler)
+    if not BUNDLED:
+        # replace the low and high level StdIO's
+        low_level_stdout = LowLevelStdIO(sys.stdout).start_capture("StdoutCapture")
+        # low_level_stderr = LowLevelStdIO(sys.stderr).start_capture("StderrCapture")
+
+        sys.stdout = HighLevelStdIO()
+        # sys.stderr = HighLevelStdIO()
+
+        # setting up the console handler
+        console_handler = ABConsoleHandler(low_level_stdout)
+        console_handler.addFilter(log_filter)
+        console_handler.setLevel(LOG_LEVEL)
+        root.addHandler(console_handler)
 
     # setting up the file handler
     file_handler = ABFileHandler()
