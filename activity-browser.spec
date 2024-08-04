@@ -6,6 +6,7 @@ import platform
 parser = argparse.ArgumentParser()
 parser.add_argument("--debug", action="store_true")
 parser.add_argument("--verbose", action="store_true")
+parser.add_argument("--console", action="store_true")
 options = parser.parse_args()
 
 python_options = [
@@ -43,7 +44,7 @@ if options.debug:
         bootloader_ignore_signals=False,
         strip=False,
         upx=True,
-        console=False,
+        console=options.console,
         disable_windowed_traceback=False,
         argv_emulation=False,
         target_arch=None,
@@ -69,7 +70,7 @@ else:
         a.binaries,
         a.datas,
         name="activity-browser",
-        console=False,
+        console=options.console,
         icon=EXE_ICON
     )
     target = exe
