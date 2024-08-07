@@ -80,7 +80,7 @@ if platform.system() == "Darwin":
         target,
         name="Activity Browser.app",
         icon="activity_browser/static/icons/activity-browser.icns",
-        bundle_identifier=None,
+        bundle_identifier="com.github.lca_activity_browser.activity_browser",
         version=os.environ.get("VERSION", "0.0.0"),
         info_plist={
             "NSPrincipalClass": "NSApplication",
