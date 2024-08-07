@@ -66,16 +66,22 @@ jobs:
       - name: Install Build Dependencies
         run: |
           python -m pip install pyinstaller --user
-      - name: Build Windows
-        id: windows_build
-        if: ${{ matrix.os == 'windows-latest' }}
+      - name: Build
         run: |
-          python scripts/createmsi.py
-          echo "##[set-output name=msi;]$(ls *.msi)"
-      - name: Upload MSI
-        if: ${{ matrix.os == 'windows-latest' }}
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            python scripts/createmsi.py
+            echo "##[set-output name=build;]$(ls *.msi)"
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            python scripts/create_macos_package.py
+            echo "##[set-output name=build;]$(ls dist/*.pkg)"
+          else
+            echo "$RUNNER_OS not supported"
+            exit 1
+          fi
+        shell: bash
+      - name: Upload
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.windows_build.outputs.msi }}
+          files: ${{ steps.windows_build.outputs.build }}
           
           
